@@ -13,6 +13,7 @@ app.use(cors());  // Permitir todas las solicitudes de cualquier origen
 // Middleware para manejar datos en formato JSON
 app.use(bodyParser.json());
 
+
 // Token de Notion y ID de la base de datos
 const notionToken = 'secret_uCBoeC7cnlFtq7VG4Dr58nBYFLFbR6dKzF00fZt2dq';
 const notionDatabaseId = 'e1c86c0d490c4ccdb7b3d92007dea981';
