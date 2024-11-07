@@ -49,7 +49,15 @@ app.post('/webhook/callbell', async (req, res) => {
                     select: {
                         name: "Prospecto"
                     }
+                },
+                Proyecto: {
+                    multi_select: [
+                        {
+                            name: "Erick Gomez"
+                        }
+                    ]
                 }
+                
             }
         }, {
             headers: {
