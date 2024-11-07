@@ -7,6 +7,7 @@ const cors = require('cors');  // Añadir el paquete de CORS
 const app = express();
 const PORT = 3000;
 
+
 // Middleware para manejar CORS
 app.use(cors());  // Permitir todas las solicitudes de cualquier origen
 
