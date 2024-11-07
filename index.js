@@ -22,9 +22,18 @@ app.post('/webhook/callbell', async (req, res) => {
         // Log para ver el cuerpo completo de la solicitud que llega del front
         console.log('Datos recibidos del Frontend:', req.body);
 
-        const { name, phoneNumber } = req.body;
+        // Extraer el objeto payload
+        const { payload } = req.body;
 
-        // Log para verificar las propiedades que se están extrayendo del req.body
+        // Verificar si el payload existe
+        if (!payload) {
+            return res.status(400).send('Payload no proporcionado');
+        }
+
+        // Extraer las propiedades del payload
+        const { name, phoneNumber } = payload;
+
+        // Log para verificar las propiedades que se están extrayendo del payload
         console.log('Propiedades extraídas:');
         console.log('Nombre:', name);
         console.log('Número de Teléfono:', phoneNumber);
