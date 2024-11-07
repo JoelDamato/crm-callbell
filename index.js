@@ -1,7 +1,5 @@
-// Importar las dependencias necesarias
 const express = require('express');
 const axios = require('axios');
-const bodyParser = require('body-parser');
 const cors = require('cors');  // Añadir el paquete de CORS
 
 // Inicializar el servidor
@@ -12,7 +10,7 @@ const PORT = 3000;
 app.use(cors());  // Permitir todas las solicitudes de cualquier origen
 
 // Middleware para manejar datos en formato JSON
-app.use(bodyParser.json());
+app.use(express.json());  // Cambiado a express.json()
 
 // Token de Notion y ID de la base de datos
 const notionToken = 'secret_uCBoeC7cnlFtq7VG4Dr58nBYFLFbR6dKzF00fZt2dq';
@@ -21,10 +19,19 @@ const notionDatabaseId = 'e1c86c0d490c4ccdb7b3d92007dea981';
 // Ruta para recibir los webhooks de Callbell
 app.post('/webhook/callbell', async (req, res) => {
     try {
+        // Log para ver el cuerpo completo de la solicitud que llega del front
+        console.log('Datos recibidos del Frontend:', req.body);
+
         const { name, phoneNumber } = req.body;
+
+        // Log para verificar las propiedades que se están extrayendo del req.body
+        console.log('Propiedades extraídas:');
+        console.log('Nombre:', name);
+        console.log('Número de Teléfono:', phoneNumber);
 
         // Verificar que tenemos los datos requeridos
         if (!phoneNumber) {
+            console.error('Error: Número de teléfono no proporcionado');
             return res.status(400).send('Número de teléfono no proporcionado');
         }
 
@@ -65,9 +72,13 @@ app.post('/webhook/callbell', async (req, res) => {
             }
         });
 
+        // Log de éxito si los datos fueron guardados correctamente
+        console.log('Datos guardados correctamente en Notion');
+
         res.status(200).send('Datos guardados correctamente en Notion');
     } catch (error) {
-        console.error('Error al guardar los datos en Notion:', error);
+        // Log de error para ver la información detallada del problema
+        console.error('Error al guardar los datos en Notion:', error.response ? error.response.data : error.message);
         res.status(500).send('Error al procesar el webhook');
     }
 });
