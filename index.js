@@ -1,3 +1,25 @@
+const express = require('express');
+const axios = require('axios');
+const bodyParser = require('body-parser');
+const cors = require('cors');  // Añadir el paquete de CORS
+
+// Inicializar el servidor
+const app = express();
+const PORT = 3000;
+
+
+// Middleware para manejar CORS
+app.use(cors());  // Permitir todas las solicitudes de cualquier origen
+
+// Middleware para manejar datos en formato JSON
+app.use(bodyParser.json());
+
+
+// Token de Notion y ID de la base de datos
+const notionToken = 'secret_uCBoeC7cnlFtq7VG4Dr58nBYFLFbR6dKzF00fZt2dq';
+const notionDatabaseId = 'e1c86c0d490c4ccdb7b3d92007dea981';
+
+// Ruta para recibir los webhooks de Callbell
 app.post('/webhook/callbell', async (req, res) => {
     try {
         const { name, phoneNumber } = req.body;
@@ -49,4 +71,10 @@ app.post('/webhook/callbell', async (req, res) => {
         console.error('Error al guardar los datos en Notion:', error);
         res.status(500).send('Error al procesar el webhook');
     }
+});
+
+
+// Iniciar el servidor
+app.listen(PORT, () => {
+    console.log(`Servidor escuchando en el puerto ${PORT}`);
 });
