@@ -1,3 +1,4 @@
+// Importar las dependencias necesarias
 const express = require('express');
 const axios = require('axios');
 const bodyParser = require('body-parser');
@@ -7,13 +8,11 @@ const cors = require('cors');  // Añadir el paquete de CORS
 const app = express();
 const PORT = 3000;
 
-
 // Middleware para manejar CORS
 app.use(cors());  // Permitir todas las solicitudes de cualquier origen
 
 // Middleware para manejar datos en formato JSON
 app.use(bodyParser.json());
-
 
 // Token de Notion y ID de la base de datos
 const notionToken = 'secret_uCBoeC7cnlFtq7VG4Dr58nBYFLFbR6dKzF00fZt2dq';
@@ -72,7 +71,6 @@ app.post('/webhook/callbell', async (req, res) => {
         res.status(500).send('Error al procesar el webhook');
     }
 });
-
 
 // Iniciar el servidor
 app.listen(PORT, () => {
