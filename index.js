@@ -45,22 +45,28 @@ app.post('/webhook/callbell', (req, res) => {
         try {
             // Extraer datos del cuerpo de la solicitud
             const { payload } = req.body;
-            if (!payload) throw new Error('Payload no proporcionado');
+            if (!payload) {
+                console.error('Error: Payload no proporcionado');
+                return;
+            }
 
-            const { name, phoneNumber, tags, createdAt, customFields } = payload;
+            const { name, phoneNumber, tags, customFields } = payload;
 
-            if (!phoneNumber) throw new Error('Número de teléfono no proporcionado');
+            if (!phoneNumber) {
+                console.error('Error: Número de teléfono no proporcionado');
+                return;
+            }
 
-            // Verificar que el webhook fue recibido hoy para proceder
+            // Verificar si el webhook fue recibido hoy
             const receivedDate = new Date();
-            const createdDate = new Date(createdAt);
+            const today = new Date();
 
             if (
-                createdDate.getDate() !== receivedDate.getDate() ||
-                createdDate.getMonth() !== receivedDate.getMonth() ||
-                createdDate.getFullYear() !== receivedDate.getFullYear()
+                receivedDate.getDate() !== today.getDate() ||
+                receivedDate.getMonth() !== today.getMonth() ||
+                receivedDate.getFullYear() !== today.getFullYear()
             ) {
-                console.log('El webhook recibido no es del día de hoy, se ignora');
+                console.log('El webhook no fue recibido hoy, se ignora');
                 return;
             }
 
@@ -79,6 +85,8 @@ app.post('/webhook/callbell', (req, res) => {
             // Seleccionar la etiqueta adecuada para Estado
             const selectedTag = Array.isArray(tags) && tags.length > 0 ? tags[tags.length - 1] : "Sin Estado";
 
+            console.log('Iniciando búsqueda del contacto en Notion...');
+
             // Buscar el contacto en la base de datos de Notion
             const searchResponse = await axios.post(`https://api.notion.com/v1/databases/${notionDatabaseId}/query`, {
                 filter: {
@@ -96,7 +104,7 @@ app.post('/webhook/callbell', (req, res) => {
             const pages = searchResponse.data.results;
 
             if (pages.length > 0) {
-                // Actualizar contacto existente solo si el webhook se recibió hoy
+                // Actualizar contacto existente ya que el webhook se recibió hoy
                 const pageId = pages[0].id;
                 const propertiesToUpdate = {
                     Estado: {
@@ -113,42 +121,50 @@ app.post('/webhook/callbell', (req, res) => {
                         multi_select: [{ name: productsAcquiredTag }]
                     };
                 }
-                await axios.patch(`https://api.notion.com/v1/pages/${pageId}`, {
-                    properties: propertiesToUpdate
-                }, {
-                    headers: {
-                        'Authorization': `Bearer ${notionToken}`,
-                        'Content-Type': 'application/json',
-                        'Notion-Version': '2022-06-28'
-                    }
-                });
 
-                console.log('Contacto actualizado correctamente en Notion');
+                console.log('Actualizando contacto existente en Notion...');
+
+                try {
+                    await axios.patch(`https://api.notion.com/v1/pages/${pageId}`, {
+                        properties: propertiesToUpdate
+                    }, {
+                        headers: {
+                            'Authorization': `Bearer ${notionToken}`,
+                            'Content-Type': 'application/json',
+                            'Notion-Version': '2022-06-28'
+                        }
+                    });
+                    console.log('Contacto actualizado correctamente en Notion');
+                } catch (error) {
+                    console.error('Error al actualizar el contacto en Notion:', error.message);
+                    if (error.response) {
+                        console.error('Detalles del error:', error.response.data);
+                    }
+                }
             } else {
-                // Crear nuevo contacto solo si se recibe un webhook creado hoy
-                if (
-                    createdDate.getDate() === receivedDate.getDate() &&
-                    createdDate.getMonth() === receivedDate.getMonth() &&
-                    createdDate.getFullYear() === receivedDate.getFullYear()
-                ) {
-                    const propertiesToCreate = {
-                        Nombre: {
-                            title: [{ text: { content: name || "Sin Nombre" } }]
-                        },
-                        Telefono: { phone_number: phoneNumber },
-                        Estado: { select: { name: selectedTag } },
-                        Proyecto: { multi_select: [{ name: "Erick Gomez" }] }
+                // Crear nuevo contacto si no existe y el webhook fue recibido hoy
+                console.log('No se encontró el contacto, creando un nuevo registro en Notion...');
+                
+                const propertiesToCreate = {
+                    Nombre: {
+                        title: [{ text: { content: name || "Sin Nombre" } }]
+                    },
+                    Telefono: { phone_number: phoneNumber },
+                    Estado: { select: { name: selectedTag } },
+                    Proyecto: { multi_select: [{ name: "Erick Gomez" }] }
+                };
+                if (productInterestTag) {
+                    propertiesToCreate["Producto de interes"] = {
+                        multi_select: [{ name: productInterestTag }]
                     };
-                    if (productInterestTag) {
-                        propertiesToCreate["Producto de interes"] = {
-                            multi_select: [{ name: productInterestTag }]
-                        };
-                    }
-                    if (productsAcquiredTag) {
-                        propertiesToCreate["Productos Adquiridos"] = {
-                            multi_select: [{ name: productsAcquiredTag }]
-                        };
-                    }
+                }
+                if (productsAcquiredTag) {
+                    propertiesToCreate["Productos Adquiridos"] = {
+                        multi_select: [{ name: productsAcquiredTag }]
+                    };
+                }
+
+                try {
                     await axios.post('https://api.notion.com/v1/pages', {
                         parent: { database_id: notionDatabaseId },
                         properties: propertiesToCreate
@@ -159,14 +175,19 @@ app.post('/webhook/callbell', (req, res) => {
                             'Notion-Version': '2022-06-28'
                         }
                     });
-
                     console.log('Datos guardados correctamente en Notion');
-                } else {
-                    console.log('No se crea un nuevo contacto ya que no fue creado hoy');
+                } catch (error) {
+                    console.error('Error al crear un nuevo registro en Notion:', error.message);
+                    if (error.response) {
+                        console.error('Detalles del error:', error.response.data);
+                    }
                 }
             }
         } catch (error) {
             console.error('Error al procesar el webhook:', error.message);
+            if (error.response) {
+                console.error('Detalles del error:', error.response.data);
+            }
         }
     })();
 });
