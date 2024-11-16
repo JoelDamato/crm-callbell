@@ -134,7 +134,7 @@ app.post('/webhook/callbell', (req, res) => {
                             'Notion-Version': '2022-06-28'
                         }
                     });
-                    console.log('Contacto actualizado correctamente en Notion');
+                    console.log(`Contacto actualizado correctamente en Notion: Fecha: ${receivedDate}, Teléfono: ${phoneNumber}, Nombre: ${name || "Sin Nombre"}, Datos Actualizados: ${Object.keys(propertiesToUpdate).join(', ')}`);
                 } catch (error) {
                     console.error('Error al actualizar el contacto en Notion:', error.message);
                     if (error.response) {
@@ -159,7 +159,7 @@ app.post('/webhook/callbell', (req, res) => {
                     };
                 }
                 if (productsAcquiredTag) {
-                    propertiesToCreate["Productos Adquiridos"] = {
+                    propertiesToCreate["Productos Adqueridos"] = {
                         multi_select: [{ name: productsAcquiredTag }]
                     };
                 }
@@ -175,7 +175,7 @@ app.post('/webhook/callbell', (req, res) => {
                             'Notion-Version': '2022-06-28'
                         }
                     });
-                    console.log('Datos guardados correctamente en Notion');
+                    console.log(`Datos creados correctamente en Notion: Fecha: ${receivedDate}, Teléfono: ${phoneNumber}, Nombre: ${name || "Sin Nombre"}`);
                 } catch (error) {
                     console.error('Error al crear un nuevo registro en Notion:', error.message);
                     if (error.response) {
