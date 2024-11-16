@@ -73,6 +73,8 @@ app.post('/webhook/callbell', (req, res) => {
             // Extraer valores de `customFields` para actualizar propiedades de Notion
             const productInterest = customFields["PI : MF-FOCUS-CUT-MFC"];
             const productsAcquired = customFields["PA : MF-FOCUS-CUT-MFC"];
+            const dni = customFields["Dni"];
+            const mail = customFields["Mail"];
 
             // Determinar etiquetas para los selects de Notion
             const productInterestTag = productInterest
@@ -121,6 +123,16 @@ app.post('/webhook/callbell', (req, res) => {
                         multi_select: [{ name: productsAcquiredTag }]
                     };
                 }
+                if (dni) {
+                    propertiesToUpdate["Dni"] = {
+                        number: parseInt(dni, 10)
+                    };
+                }
+                if (mail) {
+                    propertiesToUpdate["Email"] = {
+                        email: mail
+                    };
+                }
 
                 console.log('Actualizando contacto existente en Notion...');
 
@@ -161,6 +173,16 @@ app.post('/webhook/callbell', (req, res) => {
                 if (productsAcquiredTag) {
                     propertiesToCreate["Productos Adqueridos"] = {
                         multi_select: [{ name: productsAcquiredTag }]
+                    };
+                }
+                if (dni) {
+                    propertiesToCreate["Dni"] = {
+                        number: parseInt(dni, 10)
+                    };
+                }
+                if (mail) {
+                    propertiesToCreate["Email"] = {
+                        email: mail
                     };
                 }
 
