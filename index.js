@@ -70,19 +70,26 @@ app.post('/webhook/callbell', (req, res) => {
                 return;
             }
 
-            // Extraer valores de `customFields` para actualizar propiedades de Notion
-            const productInterest = customFields["PI : MF-FOCUS-CUT-MFC"];
-            const productsAcquired = customFields["PA : MF-FOCUS-CUT-MFC"];
-            const dni = customFields["Dni"];
-            const mail = customFields["Mail"];
+            // Verificar si customFields está presente y extraer los valores correspondientes
+            let productInterestTag = null;
+            let productsAcquiredTag = null;
+            let dni = null;
+            let mail = null;
 
-            // Determinar etiquetas para los selects de Notion
-            const productInterestTag = productInterest
-                ? customFieldMap["PI : MF-FOCUS-CUT-MFC"][productInterest]
-                : null;
-            const productsAcquiredTag = productsAcquired
-                ? customFieldMap["PA : MF-FOCUS-CUT-MFC"][productsAcquired]
-                : null;
+            if (customFields) {
+                const productInterest = customFields["PI : MF-FOCUS-CUT-MFC"];
+                const productsAcquired = customFields["PA : MF-FOCUS-CUT-MFC"];
+                dni = customFields["Dni"];
+                mail = customFields["Mail"];
+
+                // Determinar etiquetas para los selects de Notion si customFields contiene esos valores
+                productInterestTag = productInterest
+                    ? customFieldMap["PI : MF-FOCUS-CUT-MFC"][productInterest]
+                    : null;
+                productsAcquiredTag = productsAcquired
+                    ? customFieldMap["PA : MF-FOCUS-CUT-MFC"][productsAcquired]
+                    : null;
+            }
 
             // Seleccionar la etiqueta adecuada para Estado
             const selectedTag = Array.isArray(tags) && tags.length > 0 ? tags[tags.length - 1] : "Sin Estado";
@@ -136,27 +143,46 @@ app.post('/webhook/callbell', (req, res) => {
 
                 console.log('Actualizando contacto existente en Notion...');
 
-                try {
-                    await axios.patch(`https://api.notion.com/v1/pages/${pageId}`, {
-                        properties: propertiesToUpdate
-                    }, {
-                        headers: {
-                            'Authorization': `Bearer ${notionToken}`,
-                            'Content-Type': 'application/json',
-                            'Notion-Version': '2022-06-28'
+                // Intentar actualizar el contacto con varios reintentos en caso de error 502
+                const updateContactInNotion = async (pageId, propertiesToUpdate, retries = 3) => {
+                    for (let attempt = 1; attempt <= retries; attempt++) {
+                        try {
+                            await axios.patch(`https://api.notion.com/v1/pages/${pageId}`, {
+                                properties: propertiesToUpdate
+                            }, {
+                                headers: {
+                                    'Authorization': `Bearer ${notionToken}`,
+                                    'Content-Type': 'application/json',
+                                    'Notion-Version': '2022-06-28'
+                                }
+                            });
+                            console.log(`Contacto actualizado correctamente en Notion en intento #${attempt}`);
+                            return; // Salir si la actualización fue exitosa
+                        } catch (error) {
+                            if (error.response && error.response.status === 502) {
+                                console.warn(`Error 502 Bad Gateway, intento #${attempt} de ${retries}`);
+                                if (attempt === retries) {
+                                    console.error('Máximo número de intentos alcanzado. No se pudo actualizar el contacto en Notion.');
+                                    return;
+                                }
+                                await new Promise(resolve => setTimeout(resolve, attempt * 1000)); // Esperar antes de reintentar
+                            } else {
+                                console.error('Error al actualizar el contacto en Notion:', error.message);
+                                if (error.response) {
+                                    console.error('Detalles del error:', error.response.data);
+                                }
+                                return; // Salir si el error no es 502
+                            }
                         }
-                    });
-                    console.log(`Contacto actualizado correctamente en Notion: Fecha: ${receivedDate}, Teléfono: ${phoneNumber}, Nombre: ${name || "Sin Nombre"}, Datos Actualizados: ${Object.keys(propertiesToUpdate).join(', ')}`);
-                } catch (error) {
-                    console.error('Error al actualizar el contacto en Notion:', error.message);
-                    if (error.response) {
-                        console.error('Detalles del error:', error.response.data);
                     }
-                }
+                };
+
+                // Llamar a la función para actualizar el contacto existente
+                await updateContactInNotion(pageId, propertiesToUpdate);
             } else {
                 // Crear nuevo contacto si no existe y el webhook fue recibido hoy
                 console.log('No se encontró el contacto, creando un nuevo registro en Notion...');
-                
+
                 const propertiesToCreate = {
                     Nombre: {
                         title: [{ text: { content: name || "Sin Nombre" } }]
