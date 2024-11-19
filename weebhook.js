@@ -8,6 +8,22 @@ axiosRetry(axios, { retries: 3, retryDelay: (retryCount) => retryCount * 1000 })
 const notionToken = 'secret_uCBoeC7cnlFtq7VG4Dr58nBYFLFbR6dKzF00fZt2dq';
 const notionDatabaseId = 'e1c86c0d490c4ccdb7b3d92007dea981';
 
+// Mapeo de customFields
+const customFieldMap = {
+    "PI : MF-FOCUS-CUT-MFC": {
+        "MF": "Master Fade 2.0",
+        "FOCUS": "Focus",
+        "CUT": "Cutting Mastery",
+        "MFC": "Master fade 2.0 + Cutting Mastery"
+    },
+    "PA : MF-FOCUS-CUT-MFC": {
+        "MF": "Master Fade 2.0",
+        "FOCUS": "Focus",
+        "CUT": "Cutting Mastery",
+        "MFC": "Master fade 2.0 + Cutting Mastery"
+    }
+};
+
 // Normalizar el número de teléfono para mantener un formato consistente
 const normalizePhoneNumber = (phoneNumber) => {
     return phoneNumber.replace(/[^0-9]/g, ''); // Eliminar todos los caracteres excepto números
@@ -91,6 +107,26 @@ async function updateContactInNotion(pageId, payload, tags, customFields) {
     const { name, phoneNumber } = payload;
     const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
 
+    let productInterestTag = null;
+    let productsAcquiredTag = null;
+    let dni = null;
+    let email = null;
+
+    // Procesar customFields si están disponibles
+    if (customFields) {
+        const productInterest = customFields["PI : MF-FOCUS-CUT-MFC"];
+        const productsAcquired = customFields["PA : MF-FOCUS-CUT-MFC"];
+        dni = customFields["Dni"];
+        email = customFields["Mail"];
+
+        productInterestTag = productInterest
+            ? customFieldMap["PI : MF-FOCUS-CUT-MFC"][productInterest]
+            : null;
+        productsAcquiredTag = productsAcquired
+            ? customFieldMap["PA : MF-FOCUS-CUT-MFC"][productsAcquired]
+            : null;
+    }
+
     const propertiesToUpdate = {
         Nombre: {
             title: [{ text: { content: name || 'Sin Nombre' } }]
@@ -98,6 +134,28 @@ async function updateContactInNotion(pageId, payload, tags, customFields) {
         Telefono: { phone_number: normalizedPhoneNumber },
         Estado: { select: { name: tags?.[0] || 'Sin Estado' } }
     };
+
+    // Agregar campos personalizados si existen
+    if (productInterestTag) {
+        propertiesToUpdate["Producto de interes"] = {
+            multi_select: [{ name: productInterestTag }]
+        };
+    }
+    if (productsAcquiredTag) {
+        propertiesToUpdate["Productos Adquiridos"] = {
+            multi_select: [{ name: productsAcquiredTag }]
+        };
+    }
+    if (dni) {
+        propertiesToUpdate["Dni"] = {
+            number: parseInt(dni, 10)
+        };
+    }
+    if (email) {
+        propertiesToUpdate["Email"] = {
+            email: email
+        };
+    }
 
     try {
         await axios.patch(`https://api.notion.com/v1/pages/${pageId}`, {
@@ -123,6 +181,26 @@ async function createContactInNotion(payload, tags, customFields) {
     const { name, phoneNumber } = payload;
     const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
 
+    let productInterestTag = null;
+    let productsAcquiredTag = null;
+    let dni = null;
+    let email = null;
+
+    // Procesar customFields si están disponibles
+    if (customFields) {
+        const productInterest = customFields["PI : MF-FOCUS-CUT-MFC"];
+        const productsAcquired = customFields["PA : MF-FOCUS-CUT-MFC"];
+        dni = customFields["Dni"];
+        email = customFields["Mail"];
+
+        productInterestTag = productInterest
+            ? customFieldMap["PI : MF-FOCUS-CUT-MFC"][productInterest]
+            : null;
+        productsAcquiredTag = productsAcquired
+            ? customFieldMap["PA : MF-FOCUS-CUT-MFC"][productsAcquired]
+            : null;
+    }
+
     const propertiesToCreate = {
         Nombre: {
             title: [{ text: { content: name || 'Sin Nombre' } }]
@@ -130,6 +208,28 @@ async function createContactInNotion(payload, tags, customFields) {
         Telefono: { phone_number: normalizedPhoneNumber },
         Estado: { select: { name: tags?.[0] || 'Sin Estado' } }
     };
+
+    // Agregar campos personalizados si existen
+    if (productInterestTag) {
+        propertiesToCreate["Producto de interes"] = {
+            multi_select: [{ name: productInterestTag }]
+        };
+    }
+    if (productsAcquiredTag) {
+        propertiesToCreate["Productos Adquiridos"] = {
+            multi_select: [{ name: productsAcquiredTag }]
+        };
+    }
+    if (dni) {
+        propertiesToCreate["Dni"] = {
+            number: parseInt(dni, 10)
+        };
+    }
+    if (email) {
+        propertiesToCreate["Email"] = {
+            email: email
+        };
+    }
 
     try {
         const response = await axios.post('https://api.notion.com/v1/pages', {
