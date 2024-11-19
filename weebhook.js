@@ -44,6 +44,8 @@ async function handleWebhook(req, res) {
         try {
             // Extraer datos del cuerpo de la solicitud
             const { payload } = req.body;
+            console.log('Datos recibidos del webhook:', JSON.stringify(payload, null, 2)); // Consola para ver los datos recibidos
+
             if (!payload) {
                 console.error('Error: Payload no proporcionado');
                 return;
@@ -58,6 +60,7 @@ async function handleWebhook(req, res) {
 
             // Normalizar el número de teléfono
             const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+            console.log(`Número de teléfono normalizado: ${normalizedPhoneNumber}`);
 
             // Verificar si la caché ha alcanzado el tamaño máximo y reiniciarla si es necesario
             if (contactCache.size >= MAX_CACHE_SIZE) {
@@ -91,13 +94,14 @@ async function handleWebhook(req, res) {
             });
 
             const pages = searchResponse.data.results;
+            console.log('Resultado de la búsqueda en Notion:', JSON.stringify(pages, null, 2)); // Consola para ver los resultados de búsqueda
 
             if (pages.length > 0) {
                 // Actualizar contacto existente
                 const pageId = pages[0].id;
                 contactCache.set(normalizedPhoneNumber, { pageId, lastUpdated: new Date() }); // Actualizar la caché
 
-                console.log('Actualizando contacto existente en Notion...');
+                console.log(`Contacto encontrado en Notion. Actualizando: ${pageId}`);
                 await updateContactInNotion(pageId, payload, tags, customFields);
             } else {
                 // Crear nuevo contacto si no existe
@@ -106,6 +110,7 @@ async function handleWebhook(req, res) {
                 const newPageId = await createContactInNotion(payload, tags, customFields);
                 // Almacenar en caché el nuevo contacto
                 contactCache.set(normalizedPhoneNumber, { pageId: newPageId, lastUpdated: new Date() });
+                console.log(`Nuevo contacto creado con ID: ${newPageId}`);
             }
         } catch (error) {
             console.error('Error al procesar el webhook:', error.message);
