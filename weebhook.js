@@ -82,8 +82,8 @@ async function handleWebhook(req, res) {
             // Buscar el contacto en la base de datos de Notion
             const searchResponse = await axios.post(`https://api.notion.com/v1/databases/${notionDatabaseId}/query`, {
                 filter: {
-                    property: 'Telefono',
-                    phone_number: { equals: normalizedPhoneNumber }
+                    property: 'Tel ID',
+                    number: { equals: parseInt(normalizedPhoneNumber, 10) }
                 }
             }, {
                 headers: {
@@ -94,7 +94,7 @@ async function handleWebhook(req, res) {
             });
 
             const pages = searchResponse.data.results;
-            console.log('Resultado de la búsqueda en Notion:', JSON.stringify(pages, null, 2)); // Consola para ver los resultados de búsqueda
+            console.log('Resultado de la búsqueda en Notion:', pages.map(page => ({ id: page.id }))); // Consola para ver los IDs de los resultados de búsqueda
 
             if (pages.length > 0) {
                 // Actualizar contacto existente
