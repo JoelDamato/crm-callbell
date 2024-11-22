@@ -1,6 +1,5 @@
 // sendMessages.js
 const axios = require('axios');
-const { DateTime } = require('luxon'); // Importar luxon para manejar fechas y horas
 
 // Tokens y configuraciones
 const notionToken = 'secret_uCBoeC7cnlFtq7VG4Dr58nBYFLFbR6dKzF00fZt2dq';
@@ -16,38 +15,15 @@ const phoneNumbers = [
 
 // Función para obtener datos desde Notion
 async function getSalesData() {
-    // Obtener el inicio y fin del día anterior en horario de Argentina (GMT-3)
-    const yesterdayStart = DateTime.now()
-        .setZone('America/Argentina/Buenos_Aires')
-        .minus({ days: 1 })
-        .startOf('day')
-        .toISO(); // Inicio del día anterior
-
-    const yesterdayEnd = DateTime.now()
-        .setZone('America/Argentina/Buenos_Aires')
-        .minus({ days: 1 })
-        .endOf('day')
-        .toISO(); // Fin del día anterior
-
     try {
         const response = await axios.post(
             `https://api.notion.com/v1/databases/${databaseId}/query`,
             {
                 filter: {
-                    and: [
-                        {
-                            property: 'Creado',
-                            date: {
-                                on_or_after: yesterdayStart,
-                            },
-                        },
-                        {
-                            property: 'Creado',
-                            date: {
-                                on_or_before: yesterdayEnd,
-                            },
-                        },
-                    ],
+                    property: 'Creado',
+                    date: {
+                        equals: new Date().toISOString().split('T')[0], // Obtener solo las ventas de hoy
+                    },
                 },
             },
             {
@@ -160,4 +136,10 @@ async function sendMessages() {
     }
 }
 
+// Exportar la función para usarla en otros archivos
 module.exports = { sendMessages };
+
+// Ejecutar el envío de mensajes directamente al correr el archivo
+if (require.main === module) {
+    sendMessages();
+}

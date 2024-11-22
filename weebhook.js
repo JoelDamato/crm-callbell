@@ -58,13 +58,13 @@ async function handleWebhook(req, res) {
 
             console.log('Iniciando búsqueda del contacto en Notion...');
 
-            // Buscar el contacto en la base de datos de Notion por Tel ID
+            // Buscar el contacto en la base de datos de Notion por Teléfono
             const searchResponse = await axios.post(
                 `https://api.notion.com/v1/databases/${notionDatabaseId}/query`,
                 {
                     filter: {
-                        property: 'Tel ID',
-                        number: { equals: Number(normalizedPhoneNumber) }
+                        property: 'Telefono',
+                        phone_number: { equals: normalizedPhoneNumber }
                     }
                 },
                 {
@@ -78,14 +78,14 @@ async function handleWebhook(req, res) {
 
             const pages = searchResponse.data.results;
 
-            if (pages.length > 0) {
-                const pageId = pages[0].id;
-                const telId = pages[0].properties['Tel ID']?.formula?.number;
+            // Buscar la coincidencia exacta
+            const existingPage = pages.find(page => {
+                const storedPhoneNumber = page.properties['Telefono']?.phone_number || '';
+                return normalizePhoneNumber(storedPhoneNumber) === normalizedPhoneNumber;
+            });
 
-                console.log(`Tel ID recibido: ${telId}`);
-                console.log(`Tel ID esperado: ${normalizedPhoneNumber}`);
-                console.log(`Coinciden: ${telId === Number(normalizedPhoneNumber)}`);
-
+            if (existingPage) {
+                const pageId = existingPage.id;
                 console.log(`Contacto encontrado en Notion. Actualizando: ${pageId}`);
                 await updateContactInNotion(pageId, payload, tags, customFields);
             } else {
@@ -132,7 +132,7 @@ async function updateContactInNotion(pageId, payload, tags, customFields) {
             title: [{ text: { content: name || 'Sin Nombre' } }]
         },
         Telefono: { phone_number: normalizedPhoneNumber },
-        Estado: { select: { name: tags?.[0] || 'Sin Estado' } }
+        Estado: { select: { name: tags?.[0] || 'Sin Estado' } } // `select` para un único valor
     };
 
     // Agregar campos personalizados si existen
@@ -206,7 +206,10 @@ async function createContactInNotion(payload, tags, customFields) {
             title: [{ text: { content: name || 'Sin Nombre' } }]
         },
         Telefono: { phone_number: normalizedPhoneNumber },
-        Estado: { select: { name: tags?.[0] || 'Sin Estado' } }
+        Proyecto: {
+            multi_select: [{ name: 'Erick Gomez' }]
+        },
+        Estado: { select: { name: tags?.[0] || 'Sin Estado' } } // `select` para un único valor
     };
 
     // Agregar campos personalizados si existen
