@@ -1,5 +1,6 @@
 const axios = require('axios');
 
+// Token de Notion y ID de la base de datos
 const notionToken = 'secret_uCBoeC7cnlFtq7VG4Dr58nBYFLFbR6dKzF00fZt2dq';
 const notionDatabaseId = 'e1c86c0d490c4ccdb7b3d92007dea981';
 
@@ -148,9 +149,10 @@ async function updateContactInNotion(pageId, payload, tags, customFields) {
             : null;
     }
 
+    // Construir las propiedades a actualizar
     const propertiesToUpdate = {
         Nombre: {
-            title: [{ text: { content: name || 'Sin Nombre' } }]
+            title: [{ text: { content: name || 'Sin Nombre' } }] // Actualiza siempre el nombre con el valor proporcionado
         },
         Telefono: { phone_number: normalizedPhoneNumber },
         Estado: { select: { name: tags?.[0] || 'Sin Estado' } } // `select` para un único valor
