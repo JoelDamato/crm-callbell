@@ -1,33 +1,16 @@
-// Implementación para evitar la creación de contactos duplicados en Notion
 const axios = require('axios');
-const axiosRetry = require('axios-retry').default;
-const Queue = require('bull');
 
-// Configuración de reintentos automáticos para Axios
-axiosRetry(axios, { retries: 3, retryDelay: (retryCount) => retryCount * 1000 });
-
-// Token de Notion y ID de la base de datos
 const notionToken = 'secret_uCBoeC7cnlFtq7VG4Dr58nBYFLFbR6dKzF00fZt2dq';
 const notionDatabaseId = 'e1c86c0d490c4ccdb7b3d92007dea981';
 
-// Cola de procesamiento para evitar duplicados
-const contactQueue = new Queue('contactQueue');
+// Cola de solicitudes pendientes
+const requestQueue = [];
 
-// Mapeo de customFields
-const customFieldMap = {
-    "PI : MF-FOCUS-CUT-MFC": {
-        "MF": "Master Fade 2.0",
-        "FOCUS": "Focus",
-        "CUT": "Cutting Mastery",
-        "MFC": "Master fade 2.0 + Cutting Mastery"
-    },
-    "PA : MF-FOCUS-CUT-MFC": {
-        "MF": "Master Fade 2.0",
-        "FOCUS": "Focus",
-        "CUT": "Cutting Mastery",
-        "MFC": "Master fade 2.0 + Cutting Mastery"
-    }
-};
+// Procesando la cola
+let isProcessingQueue = false;
+
+// Tiempo de espera entre cada solicitud (en milisegundos)
+const PROCESSING_INTERVAL = 1000;
 
 // Normalizar el número de teléfono para mantener un formato consistente
 const normalizePhoneNumber = (phoneNumber) => {
@@ -39,79 +22,90 @@ async function handleWebhook(req, res) {
     // Responder inmediatamente para evitar timeouts
     res.status(202).send('Webhook recibido');
 
-    // Procesar los datos asíncronamente en la cola
+    // Añadir la solicitud a la cola
     const { payload } = req.body;
-    contactQueue.add(payload);
+    if (payload) {
+        requestQueue.push(payload);
+        processQueue();
+    }
 }
 
-// Procesar la cola para manejar la creación o actualización de contactos
-contactQueue.process(async (job, done) => {
-    try {
-        const payload = job.data;
-        console.log('Datos recibidos del webhook:', JSON.stringify(payload, null, 2));
+// Función para procesar la cola
+async function processQueue() {
+    if (isProcessingQueue) return; // Si ya está procesando, no hacer nada
+    isProcessingQueue = true;
 
-        if (!payload) {
-            console.error('Error: Payload no proporcionado');
-            return done(new Error('Payload no proporcionado'));
-        }
+    while (requestQueue.length > 0) {
+        const payload = requestQueue.shift(); // Obtener el primer elemento de la cola
 
-        const { name, phoneNumber, tags, customFields } = payload;
+        try {
+            console.log('Procesando payload:', JSON.stringify(payload, null, 2));
 
-        if (!phoneNumber) {
-            console.error('Error: Número de teléfono no proporcionado');
-            return done(new Error('Número de teléfono no proporcionado'));
-        }
+            const { name, phoneNumber, tags, customFields } = payload;
 
-        // Normalizar el número de teléfono
-        const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
-        console.log(`Número de teléfono normalizado: ${normalizedPhoneNumber}`);
-
-        console.log('Iniciando búsqueda del contacto en Notion...');
-
-        // Buscar el contacto en la base de datos de Notion por Teléfono
-        const searchResponse = await axios.post(
-            `https://api.notion.com/v1/databases/${notionDatabaseId}/query`,
-            {
-                filter: {
-                    property: 'Telefono',
-                    phone_number: { equals: normalizedPhoneNumber }
-                }
-            },
-            {
-                headers: {
-                    'Authorization': `Bearer ${notionToken}`,
-                    'Content-Type': 'application/json',
-                    'Notion-Version': '2022-06-28'
-                }
+            if (!phoneNumber) {
+                console.error('Error: Número de teléfono no proporcionado');
+                continue; // Pasar al siguiente elemento en la cola
             }
-        );
 
-        const pages = searchResponse.data.results;
+            const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+            console.log(`Número de teléfono normalizado: ${normalizedPhoneNumber}`);
 
-        // Buscar la coincidencia exacta
-        const existingPage = pages.find(page => {
-            const storedPhoneNumber = page.properties['Telefono']?.phone_number || '';
-            return normalizePhoneNumber(storedPhoneNumber) === normalizedPhoneNumber;
-        });
+            console.log('Iniciando búsqueda del contacto en Notion...');
 
-        if (existingPage) {
-            const pageId = existingPage.id;
-            console.log(`Contacto encontrado en Notion. Actualizando: ${pageId}`);
-            await updateContactInNotion(pageId, payload, tags, customFields);
-        } else {
-            console.log('No se encontró el contacto, creando un nuevo registro en Notion...');
-            const newPageId = await createContactInNotion(payload, tags, customFields);
-            console.log(`Nuevo contacto creado con ID: ${newPageId}`);
+            // Buscar el contacto en la base de datos de Notion por Teléfono
+            const searchResponse = await axios.post(
+                `https://api.notion.com/v1/databases/${notionDatabaseId}/query`,
+                {
+                    filter: {
+                        property: 'Telefono',
+                        phone_number: { equals: normalizedPhoneNumber }
+                    }
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${notionToken}`,
+                        'Content-Type': 'application/json',
+                        'Notion-Version': '2022-06-28'
+                    }
+                }
+            );
+
+            const pages = searchResponse.data.results;
+
+            // Buscar la coincidencia exacta
+            const existingPage = pages.find(page => {
+                const storedPhoneNumber = page.properties['Telefono']?.phone_number || '';
+                return normalizePhoneNumber(storedPhoneNumber) === normalizedPhoneNumber;
+            });
+
+            if (existingPage) {
+                const pageId = existingPage.id;
+                console.log(`Contacto encontrado en Notion. Actualizando: ${pageId}`);
+                await updateContactInNotion(pageId, payload, tags, customFields);
+            } else {
+                console.log('No se encontró el contacto, creando un nuevo registro en Notion...');
+                const newPageId = await createContactInNotion(payload, tags, customFields);
+                console.log(`Nuevo contacto creado con ID: ${newPageId}`);
+            }
+        } catch (error) {
+            console.error('Error al procesar el payload:', error.message);
+            if (error.response) {
+                console.error('Detalles del error:', error.response.data);
+            }
         }
-        done();
-    } catch (error) {
-        console.error('Error al procesar el webhook:', error.message);
-        if (error.response) {
-            console.error('Detalles del error:', error.response.data);
-        }
-        done(error);
+
+        // Esperar un tiempo antes de procesar la siguiente solicitud
+        await delay(PROCESSING_INTERVAL);
     }
-});
+
+    isProcessingQueue = false; // Permitir que nuevos elementos sean procesados
+}
+
+// Función de retardo
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // Función para actualizar contacto existente en Notion
 async function updateContactInNotion(pageId, payload, tags, customFields) {
