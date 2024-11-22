@@ -3,6 +3,22 @@ const axios = require('axios');
 const notionToken = 'secret_uCBoeC7cnlFtq7VG4Dr58nBYFLFbR6dKzF00fZt2dq';
 const notionDatabaseId = 'e1c86c0d490c4ccdb7b3d92007dea981';
 
+// Definición de customFieldMap
+const customFieldMap = {
+    "PI : MF-FOCUS-CUT-MFC": {
+        "MF": "Master Fade 2.0",
+        "FOCUS": "Focus",
+        "CUT": "Cutting Mastery",
+        "MFC": "Master fade 2.0 + Cutting Mastery"
+    },
+    "PA : MF-FOCUS-CUT-MFC": {
+        "MF": "Master Fade 2.0",
+        "FOCUS": "Focus",
+        "CUT": "Cutting Mastery",
+        "MFC": "Master fade 2.0 + Cutting Mastery"
+    }
+};
+
 // Cola de solicitudes pendientes
 const requestQueue = [];
 
