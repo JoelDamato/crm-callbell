@@ -29,56 +29,110 @@ let isProcessingQueue = false;
 // Tiempo de espera entre cada solicitud (en milisegundos)
 const PROCESSING_INTERVAL = 1000;
 
-// Función para buscar contacto por teléfono o IDF en Notion
-async function buscarContactoEnNotion(phoneNumber, uuid) {
-    let filter;
-    
-    if (uuid) {
-        // Buscar primero por UUID en el campo IDF
-        filter = {
-            property: 'IDF',
-            rich_text: { equals: uuid }
-        };
-    } else if (phoneNumber) {
-        // Si no hay UUID, buscar por teléfono
-        filter = {
-            property: 'Telefono',
-            phone_number: { equals: phoneNumber }
-        };
-    } else {
-        console.log('No hay identificador para buscar (ni UUID ni teléfono)');
-        return null;
-    }
-
-    try {
-        const response = await axios.post(
-            `https://api.notion.com/v1/databases/${notionDatabaseId}/query`,
-            { filter },
-            {
-                headers: {
-                    'Authorization': `Bearer ${notionToken}`,
-                    'Content-Type': 'application/json',
-                    'Notion-Version': '2022-06-28'
-                }
-            }
-        );
-
-        return response.data.results[0] || null;
-
-    } catch (error) {
-        console.error('Error al buscar contacto en Notion:', error.message);
-        if (error.response) {
-            console.error('Detalles del error:', error.response.data);
-        }
-        return null;
-    }
-}
-
 // Normalizar el número de teléfono para mantener un formato consistente
 const normalizePhoneNumber = (phoneNumber) => {
     if (!phoneNumber) return null;
     return phoneNumber.replace(/[^0-9]/g, ''); // Eliminar todos los caracteres excepto números
 };
+
+// Función para buscar contacto por teléfono o IDF en Notion
+async function buscarContactoEnNotion(phoneNumber, uuid, source) {
+    // Intentar buscar por UUID en el campo IDF primero
+    if (uuid) {
+        try {
+            const idfResponse = await axios.post(
+                `https://api.notion.com/v1/databases/${notionDatabaseId}/query`,
+                {
+                    filter: {
+                        property: 'IDF',
+                        rich_text: { equals: uuid }
+                    }
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${notionToken}`,
+                        'Content-Type': 'application/json',
+                        'Notion-Version': '2022-06-28'
+                    }
+                }
+            );
+
+            if (idfResponse.data.results.length > 0) {
+                console.log(`Contacto encontrado por IDF: ${uuid}`);
+                return idfResponse.data.results[0];
+            }
+        } catch (error) {
+            console.error('Error al buscar contacto por IDF:', error.message);
+        }
+    }
+
+    // Si hay número de teléfono, buscar por Tel ID (campo fórmula)
+    if (phoneNumber) {
+        const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+        
+        try {
+            // Obtener todos los registros para comparar con Tel ID
+            const response = await axios.post(
+                `https://api.notion.com/v1/databases/${notionDatabaseId}/query`,
+                {}, // Sin filtro para obtener todos los registros
+                {
+                    headers: {
+                        'Authorization': `Bearer ${notionToken}`,
+                        'Content-Type': 'application/json',
+                        'Notion-Version': '2022-06-28'
+                    }
+                }
+            );
+
+            // Buscar un registro donde Tel ID coincida con el número normalizado
+            for (const page of response.data.results) {
+                const telIdProperty = page.properties['Tel ID'];
+                
+                if (telIdProperty && telIdProperty.formula && telIdProperty.formula.string) {
+                    const telIdValue = telIdProperty.formula.string;
+                    const normalizedTelId = normalizePhoneNumber(telIdValue);
+                    
+                    if (normalizedTelId === normalizedPhoneNumber) {
+                        console.log(`Contacto encontrado por Tel ID normalizado: ${normalizedPhoneNumber}`);
+                        return page;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error al buscar contacto por Tel ID:', error.message);
+        }
+
+        // Como respaldo, buscar por el campo Telefono
+        try {
+            const phoneResponse = await axios.post(
+                `https://api.notion.com/v1/databases/${notionDatabaseId}/query`,
+                {
+                    filter: {
+                        property: 'Telefono',
+                        phone_number: { equals: phoneNumber }
+                    }
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${notionToken}`,
+                        'Content-Type': 'application/json',
+                        'Notion-Version': '2022-06-28'
+                    }
+                }
+            );
+
+            if (phoneResponse.data.results.length > 0) {
+                console.log(`Contacto encontrado por Telefono: ${phoneNumber}`);
+                return phoneResponse.data.results[0];
+            }
+        } catch (error) {
+            console.error('Error al buscar contacto por Telefono:', error.message);
+        }
+    }
+
+    console.log('No se encontró ningún contacto existente');
+    return null;
+}
 
 // Función para manejar el webhook de Callbell
 async function handleWebhook(req, res) {
@@ -103,18 +157,18 @@ async function processQueue() {
 
         try {
             const { name, phoneNumber, tags, customFields, uuid, source } = payload;
-
-            const normalizedPhoneNumber = phoneNumber ? normalizePhoneNumber(phoneNumber) : null;
             
             console.log(`Procesando contacto: ${name || 'Sin Nombre'}, Fuente: ${source}, UUID: ${uuid}`);
-            if (normalizedPhoneNumber) {
+            if (phoneNumber) {
+                const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+                console.log(`Número de teléfono: ${phoneNumber}`);
                 console.log(`Número de teléfono normalizado: ${normalizedPhoneNumber}`);
             } else {
                 console.log('Sin número de teléfono');
             }
 
-            // Buscar contacto existente usando el UUID en IDF
-            const existingPage = await buscarContactoEnNotion(normalizedPhoneNumber, uuid);
+            // Buscar contacto existente
+            const existingPage = await buscarContactoEnNotion(phoneNumber, uuid, source);
 
             if (existingPage) {
                 console.log(`Contacto existente encontrado, actualizando...`);
@@ -142,7 +196,6 @@ function delay(ms) {
 // Función para actualizar contacto existente en Notion
 async function updateContactInNotion(pageId, payload, tags, customFields) {
     const { name, phoneNumber, uuid, source } = payload;
-    const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
 
     let productInterestTag = null;
     let productsAcquiredTag = null;
@@ -156,12 +209,13 @@ async function updateContactInNotion(pageId, payload, tags, customFields) {
         dni = customFields["Dni"];
         email = customFields["Mail"];
 
-        productInterestTag = productInterest
-            ? customFieldMap["PI : MF-FOCUS-CUT-MFC"][productInterest]
-            : null;
-        productsAcquiredTag = productsAcquired
-            ? customFieldMap["PA : MF-FOCUS-CUT-MFC"][productsAcquired]
-            : null;
+        if (productInterest && customFieldMap["PI : MF-FOCUS-CUT-MFC"][productInterest]) {
+            productInterestTag = customFieldMap["PI : MF-FOCUS-CUT-MFC"][productInterest];
+        }
+        
+        if (productsAcquired && customFieldMap["PA : MF-FOCUS-CUT-MFC"][productsAcquired]) {
+            productsAcquiredTag = customFieldMap["PA : MF-FOCUS-CUT-MFC"][productsAcquired];
+        }
     }
 
     // Construir las propiedades a actualizar
@@ -172,12 +226,15 @@ async function updateContactInNotion(pageId, payload, tags, customFields) {
         Estado: { select: { name: tags?.[0] || 'Sin Estado' } }, // `select` para un único valor
         "IDF": {
             rich_text: [{ text: { content: uuid || '' } }]
+        },
+        "Fuente": {
+            select: { name: source || 'Desconocido' }
         }
     };
 
     // Añadir teléfono solo si existe
-    if (normalizedPhoneNumber) {
-        propertiesToUpdate.Telefono = { phone_number: normalizedPhoneNumber };
+    if (phoneNumber) {
+        propertiesToUpdate.Telefono = { phone_number: phoneNumber };
     }
 
     // Agregar campos personalizados si existen
@@ -224,7 +281,6 @@ async function updateContactInNotion(pageId, payload, tags, customFields) {
 // Función para crear un nuevo contacto en Notion
 async function createContactInNotion(payload, tags, customFields) {
     const { name, phoneNumber, uuid, source, href } = payload;
-    const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
 
     let productInterestTag = null;
     let productsAcquiredTag = null;
@@ -238,12 +294,13 @@ async function createContactInNotion(payload, tags, customFields) {
         dni = customFields["Dni"];
         email = customFields["Mail"];
 
-        productInterestTag = productInterest
-            ? customFieldMap["PI : MF-FOCUS-CUT-MFC"][productInterest]
-            : null;
-        productsAcquiredTag = productsAcquired
-            ? customFieldMap["PA : MF-FOCUS-CUT-MFC"][productsAcquired]
-            : null;
+        if (productInterest && customFieldMap["PI : MF-FOCUS-CUT-MFC"][productInterest]) {
+            productInterestTag = customFieldMap["PI : MF-FOCUS-CUT-MFC"][productInterest];
+        }
+        
+        if (productsAcquired && customFieldMap["PA : MF-FOCUS-CUT-MFC"][productsAcquired]) {
+            productsAcquiredTag = customFieldMap["PA : MF-FOCUS-CUT-MFC"][productsAcquired];
+        }
     }
 
     const propertiesToCreate = {
@@ -263,8 +320,8 @@ async function createContactInNotion(payload, tags, customFields) {
     };
 
     // Añadir teléfono solo si existe
-    if (normalizedPhoneNumber) {
-        propertiesToCreate.Telefono = { phone_number: normalizedPhoneNumber };
+    if (phoneNumber) {
+        propertiesToCreate.Telefono = { phone_number: phoneNumber };
     }
 
     // Agregar campos personalizados si existen
@@ -310,10 +367,41 @@ async function createContactInNotion(payload, tags, customFields) {
     }
 }
 
-/* // Para probar con el ejemplo de WhatsApp con número de teléfono
-const testPayload = {
+// Para probar con ambos ejemplos
+const testFacebookPayload = {
+  "href": "https://dash.callbell.eu/contacts/96ad2ffbd4d14f728517b3f4faadbfff",
+  "name": null,
+  "tags": [],
+  "team": {
+    "name": "REDES",
+    "uuid": "e85a681de2b9405db19513f78a071049",
+    "default": false,
+    "members": 2,
+    "createdAt": "2024-11-07T19:07:11Z"
+  },
+  "uuid": "96ad2ffbd4d14f728517b3f4faadbfff",
+  "source": "facebook",
+  "channel": {
+    "main": true,
+    "type": "facebook",
+    "uuid": "3d426d44418140948f13410731001541",
+    "title": "Erick Gomez Academy"
+  },
+  "closedAt": null,
+  "avatarUrl": null,
+  "blockedAt": null,
+  "createdAt": "2025-03-13T02:34:16Z",
+  "phoneNumber": null,
+  "assignedUser": null,
+  "customFields": {
+    "PI : MF-FOCUS-CUT-MFC": "MF"
+  },
+  "conversationHref": "https://dash.callbell.eu/chat/11bb7026a18e42a5a462881a839ea0bc"
+};
+
+const testWhatsAppPayload = {
     "href": "https://dash.callbell.eu/contacts/223d3f8e4b724a5c9dd9a87cb4071228",
-    "name": "Jeffrey test 2💈",
+    "name": "Jeffrey💈",
     "tags": [],
     "team": {
       "name": "General",
@@ -336,18 +424,29 @@ const testPayload = {
     "createdAt": "2025-03-13T03:01:11Z",
     "phoneNumber": "+506 6020 4102",
     "assignedUser": "iascinahuel@gmail.com",
-    "customFields": {},
+    "customFields": {
+      "PI : MF-FOCUS-CUT-MFC": "FOCUS"
+    },
     "conversationHref": "https://dash.callbell.eu/chat/47eae44bb73e43a5b2212f2de6e0f63b"
 };
 
-
+// Simular procesamiento del webhook para pruebas
 async function testWebhook() {
-  console.log("Probando con contacto de WhatsApp con número de teléfono:");
-  requestQueue.push(testPayload);
+  // Probar con contacto de Facebook
+  console.log("\n--- PRUEBA CON CONTACTO DE FACEBOOK ---");
+  requestQueue.push(testFacebookPayload);
+  await processQueue();
+  
+  // Esperar un poco antes de la siguiente prueba
+  await delay(2000);
+  
+  // Probar con contacto de WhatsApp
+  console.log("\n--- PRUEBA CON CONTACTO DE WHATSAPP ---");
+  requestQueue.push(testWhatsAppPayload);
   await processQueue();
 }
 
 // Ejecutar prueba
- testWebhook(); */
+testWebhook();
 
 module.exports = { handleWebhook };
