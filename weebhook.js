@@ -366,7 +366,7 @@ async function createContactInNotion(payload, tags, customFields) {
         }
     }
 }
-
+/*
 // Para probar con ambos ejemplos
 const testFacebookPayload = {
   "href": "https://dash.callbell.eu/contacts/96ad2ffbd4d14f728517b3f4faadbfff",
@@ -448,5 +448,5 @@ async function testWebhook() {
 
 // Ejecutar prueba
 testWebhook();
-
+*/
 module.exports = { handleWebhook };
