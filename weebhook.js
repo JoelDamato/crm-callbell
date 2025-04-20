@@ -195,7 +195,7 @@ function delay(ms) {
 
 // Función para actualizar contacto existente en Notion
 async function updateContactInNotion(pageId, payload, tags, customFields) {
-    const { name, phoneNumber, uuid, source } = payload;
+    const { name, phoneNumber, uuid, source, assignedUser } = payload;
 
     let productInterestTag = null;
     let productsAcquiredTag = null;
@@ -212,7 +212,7 @@ async function updateContactInNotion(pageId, payload, tags, customFields) {
         if (productInterest && customFieldMap["PI : MF-FOCUS-CUT-MFC"][productInterest]) {
             productInterestTag = customFieldMap["PI : MF-FOCUS-CUT-MFC"][productInterest];
         }
-        
+
         if (productsAcquired && customFieldMap["PA : MF-FOCUS-CUT-MFC"][productsAcquired]) {
             productsAcquiredTag = customFieldMap["PA : MF-FOCUS-CUT-MFC"][productsAcquired];
         }
@@ -221,42 +221,51 @@ async function updateContactInNotion(pageId, payload, tags, customFields) {
     // Construir las propiedades a actualizar
     const propertiesToUpdate = {
         Nombre: {
-            title: [{ text: { content: name || 'Sin Nombre' } }] // Actualiza siempre el nombre con el valor proporcionado
+            title: [{ text: { content: name || 'Sin Nombre' } }]
         },
-        Estado: { select: { name: tags?.[0] || 'Sin Estado' } }, // `select` para un único valor
-        "IDF": {
+        Estado: { select: { name: tags?.[0] || 'Sin Estado' } },
+        IDF: {
             rich_text: [{ text: { content: uuid || '' } }]
         },
-        "Fuente": {
+        Fuente: {
             select: { name: source || 'Desconocido' }
         }
     };
 
-    // Añadir teléfono solo si existe
     if (phoneNumber) {
         propertiesToUpdate.Telefono = { phone_number: phoneNumber };
     }
 
-    // Agregar campos personalizados si existen
     if (productInterestTag) {
         propertiesToUpdate["Producto de interes"] = {
             multi_select: [{ name: productInterestTag }]
         };
     }
+
     if (productsAcquiredTag) {
         propertiesToUpdate["Productos Adquiridos"] = {
             multi_select: [{ name: productsAcquiredTag }]
         };
     }
+
     if (dni) {
         propertiesToUpdate["Dni"] = {
             number: parseInt(dni, 10)
         };
     }
+
     if (email) {
         propertiesToUpdate["Email"] = {
             email: email
         };
+    }
+
+    // 🟡 NUEVO: Guardar el responsable si llega
+    if (assignedUser) {
+        propertiesToUpdate["Responsable"] = {
+            rich_text: [{ text: { content: assignedUser } }]
+        };
+        
     }
 
     try {
@@ -278,9 +287,10 @@ async function updateContactInNotion(pageId, payload, tags, customFields) {
     }
 }
 
+
 // Función para crear un nuevo contacto en Notion
 async function createContactInNotion(payload, tags, customFields) {
-    const { name, phoneNumber, uuid, source, href } = payload;
+    const { name, phoneNumber, uuid, source, href, assignedUser } = payload;
 
     let productInterestTag = null;
     let productsAcquiredTag = null;
@@ -297,7 +307,7 @@ async function createContactInNotion(payload, tags, customFields) {
         if (productInterest && customFieldMap["PI : MF-FOCUS-CUT-MFC"][productInterest]) {
             productInterestTag = customFieldMap["PI : MF-FOCUS-CUT-MFC"][productInterest];
         }
-        
+
         if (productsAcquired && customFieldMap["PA : MF-FOCUS-CUT-MFC"][productsAcquired]) {
             productsAcquiredTag = customFieldMap["PA : MF-FOCUS-CUT-MFC"][productsAcquired];
         }
@@ -310,21 +320,19 @@ async function createContactInNotion(payload, tags, customFields) {
         Proyecto: {
             multi_select: [{ name: 'Erick Gomez' }]
         },
-        Estado: { select: { name: tags?.[0] || 'Sin Estado' } }, // `select` para un único valor
-        "IDF": {
+        Estado: { select: { name: tags?.[0] || 'Sin Estado' } },
+        IDF: {
             rich_text: [{ text: { content: uuid || '' } }]
         },
-        "Fuente": {
+        Fuente: {
             select: { name: source || 'Desconocido' }
         }
     };
 
-    // Añadir teléfono solo si existe
     if (phoneNumber) {
         propertiesToCreate.Telefono = { phone_number: phoneNumber };
     }
 
-    // Agregar campos personalizados si existen
     if (productInterestTag) {
         propertiesToCreate["Producto de interes"] = {
             multi_select: [{ name: productInterestTag }]
@@ -344,6 +352,13 @@ async function createContactInNotion(payload, tags, customFields) {
         propertiesToCreate["Email"] = {
             email: email
         };
+    }
+    // 🟡 NUEVO: Guardar el responsable si llega
+    if (assignedUser) {
+        propertiesToUpdate["Responsable"] = {
+            rich_text: [{ text: { content: assignedUser } }]
+        };
+        
     }
 
     try {
@@ -366,7 +381,9 @@ async function createContactInNotion(payload, tags, customFields) {
         }
     }
 }
-/*
+
+
+
 // Para probar con ambos ejemplos
 const testFacebookPayload = {
   "href": "https://dash.callbell.eu/contacts/96ad2ffbd4d14f728517b3f4faadbfff",
@@ -384,7 +401,7 @@ const testFacebookPayload = {
   "channel": {
     "main": true,
     "type": "facebook",
-    "uuid": "3d426d44418140948f13410731001541",
+    "uuid": "3d426d444181409748f13410731001541",
     "title": "Erick Gomez Academy"
   },
   "closedAt": null,
@@ -422,7 +439,7 @@ const testWhatsAppPayload = {
     "avatarUrl": null,
     "blockedAt": null,
     "createdAt": "2025-03-13T03:01:11Z",
-    "phoneNumber": "+506 6020 4102",
+    "phoneNumber": "+506 6020 41026666",
     "assignedUser": "iascinahuel@gmail.com",
     "customFields": {
       "PI : MF-FOCUS-CUT-MFC": "FOCUS"
@@ -448,5 +465,5 @@ async function testWebhook() {
 
 // Ejecutar prueba
 testWebhook();
-*/
+
 module.exports = { handleWebhook };
