@@ -415,16 +415,7 @@ const testFacebookPayload = {
   },
   "conversationHref": "https://dash.callbell.eu/chat/11bb7026a18e42a5a462881a839ea0bc"
 };
-
-const testWhatsAppPayload = {
-    "href": "https://dash.callbell.eu/contacts/223d3f8e4b724a5c9dd9a87cb4071228",
-    "name": "Jeffrey💈",
-    "tags": [],
-    "team": {
-      "name": "General",
-      "uuid": "91f8b735b6c74c4e80d3c92fae38412c",
-      "default": true,
-      "members": 2,
+  "members": 2,
       "createdAt": "2024-11-07T19:02:44Z"
     },
     "uuid": "223d3f8e4b724a5c9dd9a87cb4071228",
@@ -437,6 +428,15 @@ const testWhatsAppPayload = {
     },
     "closedAt": null,
     "avatarUrl": null,
+    
+const testWhatsAppPayload = {
+    "href": "https://dash.callbell.eu/contacts/223d3f8e4b724a5c9dd9a87cb4071228",
+    "name": "Jeffrey💈",
+    "tags": [],
+    "team": {
+      "name": "General",
+      "uuid": "91f8b735b6c74c4e80d3c92fae38412c",
+      "default": true,
     "blockedAt": null,
     "createdAt": "2025-03-13T03:01:11Z",
     "phoneNumber": "+506 6020 41026666",
@@ -466,5 +466,6 @@ async function testWebhook() {
 // Ejecutar prueba
 testWebhook();
 */
+console.log(req.body)
 
 module.exports = { handleWebhook };
