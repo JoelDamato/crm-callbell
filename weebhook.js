@@ -137,6 +137,8 @@ async function buscarContactoEnNotion(phoneNumber, uuid, source) {
 // Función para manejar el webhook de Callbell
 async function handleWebhook(req, res) {
     // Responder inmediatamente para evitar timeouts
+    console.log("Payload recibido:", JSON.stringify(req.body, null, 2));
+
     res.status(202).send('Webhook recibido');
 
     // Añadir la solicitud a la cola
@@ -466,6 +468,6 @@ async function testWebhook() {
 // Ejecutar prueba
 testWebhook();
 */
-console.log(req.body)
+
 
 module.exports = { handleWebhook };
