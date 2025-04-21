@@ -319,9 +319,6 @@ async function createContactInNotion(payload, tags, customFields) {
         Nombre: {
             title: [{ text: { content: name || 'Sin Nombre' } }]
         },
-        Proyecto: {
-            multi_select: [{ name: 'Erick Gomez' }]
-        },
         Estado: { select: { name: tags?.[0] || 'Sin Estado' } },
         IDF: {
             rich_text: [{ text: { content: uuid || '' } }]
