@@ -356,8 +356,9 @@ async function createContactInNotion(payload, tags, customFields) {
         };
     }
     // 🟡 NUEVO: Guardar el responsable si llega
+   
     if (assignedUser) {
-        propertiesToUpdate["Responsable"] = {
+        propertiesToCreate["Responsable"] = {
             rich_text: [{ text: { content: assignedUser } }]
         };
         
