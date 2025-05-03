@@ -222,9 +222,12 @@ async function updateContactInNotion(pageId, payload, tags, customFields) {
 
     // Construir las propiedades a actualizar
     const propertiesToUpdate = {
+    /*
         Nombre: {
             title: [{ text: { content: name || 'Sin Nombre' } }]
         },
+        */
+
         Estado: { select: { name: tags?.[0] || 'Sin Estado' } },
         IDF: {
             rich_text: [{ text: { content: uuid || '' } }]
@@ -316,9 +319,12 @@ async function createContactInNotion(payload, tags, customFields) {
     }
 
     const propertiesToCreate = {
+        /*
         Nombre: {
             title: [{ text: { content: name || 'Sin Nombre' } }]
         },
+        */
+       
         Estado: { select: { name: tags?.[0] || 'Sin Estado' } },
         IDF: {
             rich_text: [{ text: { content: uuid || '' } }]
